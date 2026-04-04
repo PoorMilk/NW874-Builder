@@ -61,14 +61,12 @@ jobs:
       with:
         path: |
           openwrt/dl
-          openwrt/build_dir
-          openwrt/staging_dir
-          openwrt/tmp
           openwrt/.ccache
         key: openwrt-cache-${{ hashFiles('openwrt/.config') }}-${{ github.run_id }}
         restore-keys: |
           openwrt-cache-${{ hashFiles('openwrt/.config') }}-
           openwrt-cache-
+        retention-days: 7
     - name: Download package
       id: package
       run: |
