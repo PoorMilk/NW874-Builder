@@ -70,23 +70,21 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: Cache OpenWrt build
+    - name: Cache ccache only
       uses: actions/cache@v4
       with:
-        path: |
-          openwrt/dl
-          openwrt/.ccache
-        key: openwrt-cache-${{ hashFiles('openwrt/.config') }}-${{ github.run_id }}
+        path: openwrt/.ccache
+        key: openwrt-ccache-${{ hashFiles('openwrt/.config') }}
         restore-keys: |
-          openwrt-cache-${{ hashFiles('openwrt/.config') }}-
-          openwrt-cache-
+          openwrt-ccache-
         retention-days: 7
 
-    - name: Download package
+    - name: Download package (fresh dl)
       id: package
       run: |
         cd openwrt
         make defconfig
+        rm -rf dl
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
