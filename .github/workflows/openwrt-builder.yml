@@ -3,7 +3,7 @@ name: OpenWrt Builder
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 0 * * 1#1"
+    - cron: "30 0 1 * *"
 
 env:
   REPO_URL: https://github.com/PoorMilk/NW874-ImmortalWrt
