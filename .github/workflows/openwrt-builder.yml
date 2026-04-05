@@ -3,7 +3,7 @@ name: OpenWrt Builder
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 0 * * 3"
+    - cron: "30 0 * * 1#1"
 
 env:
   REPO_URL: https://github.com/PoorMilk/NW874-ImmortalWrt
@@ -70,24 +70,12 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: Cache ccache only
-      uses: actions/cache@v4
-      with:
-        path: openwrt/.ccache
-        key: openwrt-ccache-${{ hashFiles('openwrt/.config') }}
-        restore-keys: |
-          openwrt-ccache-
-        retention-days: 7
-
-    - name: Download package (fresh dl)
+    - name: Download package
       id: package
       run: |
         cd openwrt
         make defconfig
-        rm -rf dl
         make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
 
     - name: Compile the firmware
       id: compile
