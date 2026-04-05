@@ -1,8 +1,10 @@
 name: OpenWrt Builder
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 0 * * *"
+    - cron: "30 0 * * 3"
+
 env:
   REPO_URL: https://github.com/PoorMilk/NW874-ImmortalWrt
   REPO_BRANCH: main
@@ -14,12 +16,18 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
+
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+
     steps:
     - name: Checkout
       uses: actions/checkout@main
+
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -33,22 +41,27 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
+
     - name: Clone source code
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
     - name: Load custom feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
+
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
+
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
+
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
@@ -56,6 +69,7 @@ jobs:
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+
     - name: Cache OpenWrt build
       uses: actions/cache@v4
       with:
@@ -67,6 +81,7 @@ jobs:
           openwrt-cache-${{ hashFiles('openwrt/.config') }}-
           openwrt-cache-
         retention-days: 7
+
     - name: Download package
       id: package
       run: |
@@ -75,6 +90,7 @@ jobs:
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
+
     - name: Compile the firmware
       id: compile
       run: |
@@ -85,15 +101,18 @@ jobs:
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
     - name: Check space usage
       if: (!cancelled())
       run: df -hT
+
     - name: Upload bin directory
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
+
     - name: Organize files
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
@@ -102,43 +121,61 @@ jobs:
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
+
     - name: Upload firmware directory
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
-    - name: Delete existing latest release
+
+    - name: Package firmware for release
+      id: package_release
+      if: env.UPLOAD_RELEASE == 'true' && steps.organize.outputs.status == 'success'
+      run: |
+        cd ${{ env.FIRMWARE }}
+        RELEASE_TAG=$(date +%Y%m%d-%H%M%S)
+        zip -r NW874-360T7-OpenWrt-$RELEASE_TAG.zip .
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+        echo "ZIP_FILE=NW874-360T7-OpenWrt-$RELEASE_TAG.zip" >> $GITHUB_ENV
+
+    - name: Create Release
+      if: env.UPLOAD_RELEASE == 'true' && steps.organize.outputs.status == 'success'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.RELEASE_TAG }}
+        name: "NW874-360T7 OpenWrt ${{ env.RELEASE_TAG }}"
+        files: ${{ env.FIRMWARE }}/${{ env.ZIP_FILE }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Keep latest 2 releases
       uses: actions/github-script@v7
       with:
         script: |
-          try {
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: 'latest'
-            });
-            await github.rest.repos.deleteRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: release.id
-            });
-            await github.rest.git.deleteRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: 'tags/latest'
-            });
-          } catch(e) {}
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
+          const { owner, repo } = context.repo;
+          const releases = await github.paginate(github.rest.repos.listReleases, {
+            owner, repo, per_page: 100
+          });
+          const toDelete = releases.slice(2);
+          for (const rel of toDelete) {
+            await github.rest.repos.deleteRelease({ owner, repo, release_id: rel.id });
+            await github.rest.git.deleteRef({ owner, repo, ref: `tags/${rel.tag_name}` }).catch(() => {});
+          }
+
+    - name: Keep latest 5 workflow runs
+      uses: actions/github-script@v7
       with:
-        tag_name: latest
-        name: "NW874-360T7 Latest"
-        files: ${{ env.FIRMWARE }}/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Delete workflow runs
-      uses: Mattraks/delete-workflow-runs@main
-      with:
-        retain_days: 0
-        keep_minimum_runs: 2
+        script: |
+          const { owner, repo } = context.repo;
+          const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+            owner, repo,
+            per_page: 100
+          });
+          const toDelete = runs.slice(5);
+          for (const run of toDelete) {
+            await github.rest.actions.deleteWorkflowRun({
+              owner, repo,
+              run_id: run.id
+            });
+          }
