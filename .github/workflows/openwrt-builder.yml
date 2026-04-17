@@ -112,7 +112,7 @@ jobs:
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       with:
         name: OpenWrt_firmware_${{ env.FILE_DATE }}
-        path: openwrt/bin/targets/mediatek/filogic/
+        path: openwrt/bin/targets/mediatek/filogic/*.bin
 
     - name: Package firmware for release
       id: package_release
