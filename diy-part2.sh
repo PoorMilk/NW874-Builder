@@ -19,3 +19,25 @@
 # Modify hostname
 #sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
 sed -i 's/OpenWrt/NW874-360T7/g' package/base-files/files/bin/config_generate
+
+# 添加 Coremark 开机自启
+cat > package/base-files/files/etc/init.d/coremark << 'EOF'
+#!/bin/sh /etc/rc.common
+START=99
+start() {
+    if [ ! -f /etc/bench.log ]; then
+        /etc/coremark.sh > /etc/bench.log 2>&1 &
+    fi
+}
+EOF
+
+chmod +x package/base-files/files/etc/init.d/coremark
+
+cat > package/base-files/files/etc/coremark.sh << 'EOF'
+#!/bin/sh
+coremark > /tmp/bench.log
+sleep 1
+cat /tmp/bench.log >> /etc/bench.log
+EOF
+
+chmod +x package/base-files/files/etc/coremark.sh
