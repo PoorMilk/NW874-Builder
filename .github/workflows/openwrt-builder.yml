@@ -104,6 +104,7 @@ jobs:
       run: |
         cd openwrt/bin/targets/*/*
         rm -rf packages
+        rm -rf *.buildinfo *.json sha256sums profiles.json
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
@@ -119,6 +120,7 @@ jobs:
       if: env.UPLOAD_RELEASE == 'true' && steps.organize.outputs.status == 'success'
       run: |
         cd ${{ env.FIRMWARE }}
+        rm -rf packages *.buildinfo *.json sha256sums profiles.json
         RELEASE_TAG=$(date +%Y%m%d-%H%M%S)
         zip -r NW874-360T7-OpenWrt-$RELEASE_TAG.zip .
         echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
@@ -126,7 +128,7 @@ jobs:
 
     - name: Create Release
       if: env.UPLOAD_RELEASE == 'true' && steps.organize.outputs.status == 'success'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/gh-release@v2
       with:
         tag_name: ${{ env.RELEASE_TAG }}
         name: "NW874-360T7 OpenWrt ${{ env.RELEASE_TAG }}"
