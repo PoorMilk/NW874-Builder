@@ -98,10 +98,6 @@ jobs:
       run: |
         cd openwrt
         make defconfig
-        echo "CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7=y" >> .config
-        sed -i '/CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/s/^/# /' .config
-        sed -i 's/^# \(CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7=y\)/\1/' .config
-        make defconfig
         make download -j8
 
     - name: Compile the firmware
