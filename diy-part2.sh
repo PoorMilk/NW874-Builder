@@ -6,4 +6,4 @@
 #
 
 # 修改主机名
-sed -i 's/OpenWrt/NW874-360T7/g' package/base-files/files/bin/config_generate
+sed -i 's/OpenWrt/NW874/g' package/base-files/files/bin/config_generate
