@@ -70,11 +70,6 @@ jobs:
         ./scripts/feeds update packages
         ./scripts/feeds install -a -p packages golang
 
-    - name: Set Go proxy for xray-core
-      run: |
-        echo "GOPROXY=https://goproxy.cn,direct" >> $GITHUB_ENV
-        echo "GO111MODULE=on" >> $GITHUB_ENV
-
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
