@@ -11,4 +11,3 @@
 #
 
 # Add feed sources for SSR Plus+ and other packages
-echo
